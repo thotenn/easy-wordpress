@@ -8,7 +8,7 @@ Automated system to deploy WordPress with Docker, including Nginx as reverse pro
 - Domain pointing to server
 
 ## 🛠️ Configuration
-You only need to modify two variables in `start.sh`:
+You only need to modify two variables in `init.sh`:
 ```bash
 DOMAIN="your-domain.com"
 APP_PATH="/installation/path"
