@@ -94,8 +94,11 @@ EOL
 
 # Create initial Nginx configuration
 create_nginx_config() {
-    log "Creating initial Nginx configuration for SSL certificate acquisition..."
-    cat > "$APP_PATH/nginx/default.conf" << EOL
+    log "Creating Nginx configuration..."
+    
+    if [ "${USE_SSL:-false}" = "true" ]; then
+        log "Creating initial Nginx configuration for SSL certificate acquisition..."
+        cat > "$APP_PATH/nginx/default.conf" << EOL
 server {
     listen 80;
     server_name $DOMAIN;
@@ -120,11 +123,11 @@ server {
 }
 EOL
 
-    log "Waiting for initial configuration to take effect..."
-    sleep 10
+        log "Waiting for initial configuration to take effect..."
+        sleep 10
 
-    log "Creating SSL-enabled Nginx configuration..."
-    cat > "$APP_PATH/nginx/default.conf" << EOL
+        log "Creating SSL-enabled Nginx configuration..."
+        cat > "$APP_PATH/nginx/default.conf" << EOL
 server {
     listen 80;
     listen [::]:80;
@@ -252,16 +255,21 @@ start_containers() {
 
 # Configure SSL
 configure_ssl() {
-    log "Obtaining SSL certificate..."
-    docker-compose run --rm certbot certonly \
-        --webroot \
-        --webroot-path /var/www/certbot \
-        --agree-tos \
-        --no-eff-email \
-        -d "$DOMAIN"
+    if [ "${USE_SSL:-false}" = "true" ]; then
+        log "Obtaining SSL certificate..."
+        docker-compose run --rm certbot certonly \
+            --webroot \
+            --webroot-path /var/www/certbot \
+            --agree-tos \
+            --no-eff-email \
+            -d "$DOMAIN"
 
-    # Set up auto-renewal
-    (crontab -l 2>/dev/null; echo "0 12 1,15 * * $APP_PATH/ssl-renew.sh >> /var/log/le-renew.log 2>&1") | crontab -
+        # Set up auto-renewal
+        (crontab -l 2>/dev/null; echo "0 12 1,15 * * $APP_PATH/ssl-renew.sh >> /var/log/le-renew.log 2>&1") | crontab -
+        log "SSL configured successfully"
+    else
+        log "Skipping SSL configuration as USE_SSL is not enabled"
+    fi
 }
 
 # Create systemd service
@@ -307,7 +315,9 @@ main() {
     preflight_checks
     create_directories
     copy_config_files
-    create_ssl_renewal
+    if [ "${USE_SSL:-false}" = "true" ]; then
+        create_ssl_renewal
+    fi
     create_nginx_config
     install_docker
     configure_firewall
