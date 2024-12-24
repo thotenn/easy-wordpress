@@ -57,8 +57,9 @@ echo "✓ Nginx configuration created"
 echo "Step 4: Copying configuration files..."
 cp docker-compose.yml $APP_PATH/
 cp .env $APP_PATH/
-cp .restart.sh $APP_PATH/
-cp .monitor.sh $APP_PATH/
+cp load_env.sh $APP_PATH/
+cp restart.sh $APP_PATH/
+cp monitor.sh $APP_PATH/
 echo "✓ Configuration files copied"
 
 echo "Step 5: Updating system packages..."
@@ -158,8 +159,12 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=$APP_PATH/restart.sh
+User=root
+WorkingDirectory=$APP_PATH
+ExecStart=/usr/bin/bash $APP_PATH/restart.sh
 RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -176,11 +181,13 @@ echo "Step 19: Setting up monitor script..."
 chmod +x $APP_PATH/monitor.sh
 
 echo "Step 20: Creating global alias..."
-echo "alias monitor='sudo $APP_PATH/monitor.sh'" >> /etc/bash.bashrc
+echo "alias wp-monitor='sudo $APP_PATH/monitor.sh'" >> /etc/bash.bashrc
+echo "alias wp-restart='sudo $APP_PATH/restart.sh'" >> /etc/bash.bashrc
 source /etc/bash.bashrc
 
 echo "=== Installation completed! ==="
 echo "Your WordPress site should be available at https://$DOMAIN"
 echo "SSL certificates will automatically renew on the 1st and 15th of each month"
 echo "The application will automatically restart on system reboot"
-echo "To monitor your WordPress installation, type 'monitor' from anywhere in the system"
+echo "To monitor your WordPress installation, type 'wp-monitor' from anywhere in the system"
+echo "To restart your WordPress installation, type 'wp-restart' from anywhere in the system"
