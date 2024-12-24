@@ -16,8 +16,8 @@ APP_PATH="/installation/path"
 
 ## 🚀 Installation
 ```bash
-chmod +x start.sh
-./start.sh
+chmod +x init.sh
+./init.sh
 ```
 
 ## ✨ Features
