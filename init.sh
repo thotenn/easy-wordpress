@@ -86,9 +86,7 @@ ufw enable
 
 echo "Step 11: Checking and stopping conflicting services..."
 sudo lsof -i :80
-# Stop the service (likely Apache)
 sudo systemctl stop apache2
-# Or for Nginx if you are using it
 sudo systemctl stop nginx
 
 echo "Step 12: Starting Docker containers..."
@@ -127,7 +125,7 @@ server {
     client_max_body_size 64M;
 
     location / {
-        proxy_pass http://wordpress_wordpress_1;
+        proxy_pass http://wordpress:80;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';

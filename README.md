@@ -20,6 +20,12 @@ chmod +x init.sh
 ./init.sh
 ```
 
+## ⚙️ Restarting services
+```bash
+chmod +x restart.sh
+./restart.sh
+```
+
 ## ✨ Features
 - Latest WordPress
 - MySQL 5.7
