@@ -2,9 +2,9 @@
 # This is for a Ubuntu 24.04 LTS server
 # This script you can use to setup a WordPress site with Docker, just one time
 
-# Vars
-DOMAIN="mysite.com"
-APP_PATH="/home/apps/wordpress"
+# Load vars
+source "$(dirname "$(dirname "${BASH_SOURCE[0]}")")/load_env.sh"
+load_env
 
 echo "=== Starting WordPress with Docker installation process ==="
 
@@ -171,7 +171,20 @@ systemctl daemon-reload
 systemctl enable wordpress-restart.service
 systemctl start wordpress-restart.service
 
+echo "Step 19: Creating monitor script..."
+cat > $APP_PATH/monitor.sh << 'EOL'
+[PASTE_ENTIRE_MONITOR_SCRIPT_HERE]
+EOL
+
+echo "Step 20: Setting up monitor script..."
+chmod +x $APP_PATH/monitor.sh
+
+echo "Step 21: Creating global alias..."
+echo "alias monitor='sudo $APP_PATH/monitor.sh'" >> /etc/bash.bashrc
+source /etc/bash.bashrc
+
 echo "=== Installation completed! ==="
 echo "Your WordPress site should be available at https://$DOMAIN"
 echo "SSL certificates will automatically renew on the 1st and 15th of each month"
 echo "The application will automatically restart on system reboot"
+echo "To monitor your WordPress installation, type 'monitor' from anywhere in the system"

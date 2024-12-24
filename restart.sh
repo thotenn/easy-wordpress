@@ -1,6 +1,7 @@
 #!/bin/bash
 
-APP_PATH="/home/apps/wordpress"
+source "$(dirname "$(dirname "${BASH_SOURCE[0]}")")/load_env.sh"
+load_env
 
 echo "Step 1: Checking and stopping conflicting services..."
 sudo lsof -i :80
