@@ -94,8 +94,8 @@ cd $APP_PATH
 docker-compose up -d
 
 echo "Step 13: Waiting for containers to be ready..."
-while [ "$(docker-compose ps -q wordpress_webserver_1 | xargs docker inspect -f '{{.State.Running}}')" != "true" ]; do
-    echo "Waiting wordpress_webserver_1 container to be running..."
+while [ "$(docker ps -q --filter name=wordpress-webserver-1 | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null)" != "true" ]; do
+    echo "Waiting for webserver container to be running..."
     sleep 5
 done
 echo "✓ Containers are ready"
