@@ -57,6 +57,7 @@ echo "✓ Nginx configuration created"
 echo "Step 4: Copying configuration files..."
 cp docker-compose.yml $APP_PATH/
 cp .env $APP_PATH/
+cp .restart.sh $APP_PATH/
 echo "✓ Configuration files copied"
 
 echo "Step 5: Updating system packages..."
@@ -147,6 +148,30 @@ echo "Step 16: Setting up SSL auto-renewal..."
 chmod +x $APP_PATH/ssl-renew.sh
 (crontab -l 2>/dev/null; echo "0 12 1,15 * * $APP_PATH/ssl-renew.sh >> /var/log/le-renew.log 2>&1") | crontab -
 
+echo "Step 17: Creating systemd service for auto-restart..."
+cat > /etc/systemd/system/wordpress-restart.service << EOL
+[Unit]
+Description=WordPress Docker Restart Service
+After=docker.service network.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=$APP_PATH/restart.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+echo "Step 18: Configuring systemd service..."
+chmod +x $APP_PATH/restart.sh
+chmod 644 /etc/systemd/system/wordpress-restart.service
+systemctl daemon-reload
+systemctl enable wordpress-restart.service
+systemctl start wordpress-restart.service
+
 echo "=== Installation completed! ==="
 echo "Your WordPress site should be available at https://$DOMAIN"
 echo "SSL certificates will automatically renew on the 1st and 15th of each month"
+echo "The application will automatically restart on system reboot"
