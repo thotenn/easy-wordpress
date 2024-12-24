@@ -58,6 +58,7 @@ echo "Step 4: Copying configuration files..."
 cp docker-compose.yml $APP_PATH/
 cp .env $APP_PATH/
 cp .restart.sh $APP_PATH/
+cp .monitor.sh $APP_PATH/
 echo "✓ Configuration files copied"
 
 echo "Step 5: Updating system packages..."
@@ -171,15 +172,10 @@ systemctl daemon-reload
 systemctl enable wordpress-restart.service
 systemctl start wordpress-restart.service
 
-echo "Step 19: Creating monitor script..."
-cat > $APP_PATH/monitor.sh << 'EOL'
-[PASTE_ENTIRE_MONITOR_SCRIPT_HERE]
-EOL
-
-echo "Step 20: Setting up monitor script..."
+echo "Step 19: Setting up monitor script..."
 chmod +x $APP_PATH/monitor.sh
 
-echo "Step 21: Creating global alias..."
+echo "Step 20: Creating global alias..."
 echo "alias monitor='sudo $APP_PATH/monitor.sh'" >> /etc/bash.bashrc
 source /etc/bash.bashrc
 
