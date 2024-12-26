@@ -53,6 +53,36 @@ enable_service() {
     fi
 }
 
+# Función para verificar el estado de Docker
+# Function to check Docker service status
+check_docker_running() {
+    local max_attempts=30
+    local attempt=1
+    
+    log "Checking Docker service status..."
+    
+    while [ $attempt -le $max_attempts ]; do
+        if [ -S "/var/run/docker.sock" ]; then
+            if docker info >/dev/null 2>&1; then
+                log "✓ Docker service is running"
+                return 0
+            fi
+        fi
+        
+        log "Waiting for Docker service to start (attempt $attempt/$max_attempts)..."
+        if is_container; then
+            service docker start || true
+        else
+            systemctl start docker || true
+        fi
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    
+    log "Error: Docker service failed to start after $max_attempts attempts"
+    return 1
+}
+
 # Pre-flight checks
 preflight_checks() {
     if [ "$EUID" -ne 0 ]; then 
@@ -346,14 +376,21 @@ main() {
     log "Step 6: Enabling and checking services..."
     enable_checking_services
 
-    log "Step 7: Starting Docker containers..."
-    cd "$APP_PATH"
+    log "Step 7: Verifying Docker service..."
+    if ! check_docker_running; then
+        log "Error: Docker service is not running properly"
+        exit 1
+    fi
+
+    log "Step 8: Starting Docker containers..."
+    cd "$APP_PATH" || exit 1
+    docker-compose down 2>/dev/null || true  # Asegurarse de que no haya contenedores anteriores
     docker-compose up -d
 
-    log "Step 8: Configuring SSL..."
+    log "Step 9: Configuring SSL..."
     configure_ssl
 
-    log "Step 9: Creating services..."
+    log "Step 10: Creating services..."
     create_services
 
     log "=== Installation completed successfully! ==="
