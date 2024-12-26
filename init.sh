@@ -234,7 +234,7 @@ install_docker() {
 
     log "Installing Docker client packages..."
     apt update
-    apt install -y docker-ce-cli docker-compose-plugin
+    apt install -y docker-ce docker-ce-cli docker-compose containerd.io docker-compose-plugin certbot python3-certbot-nginx
 
     # Configurar permisos para el socket de Docker
     log "Configuring Docker permissions..."
@@ -346,7 +346,7 @@ enable_checking_services() {
     if [ "$USE_WEBSERVER" = "true" ]; then
         if ! command -v ufw >/dev/null 2>&1; then
             log "Installing UFW firewall..."
-            apt install -y ufw
+            apt install -y ufw lsof
         fi
         ufw allow 80/tcp
         if [ "$USE_SSL" = "true" ]; then
@@ -357,9 +357,11 @@ enable_checking_services() {
         ufw status
         log "✓ Firewall configured"
 
-        lsof -i :80
-        systemctl stop apache2
-        systemctl stop nginx
+        if lsof -i :80 >/dev/null 2>&1; then
+            log "Stopping services using port 80..."
+            systemctl stop apache2 2>/dev/null || true
+            systemctl stop nginx 2>/dev/null || true
+        fi
         log "✓ Conflicting services stopped"
     fi
 }
