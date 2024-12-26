@@ -64,7 +64,7 @@ preflight_checks() {
 
     # Check disk space
     local free_space
-    free_space=$(df -k "$(dirname "$APP_PATH")" | tail -1 | awk '{print \$4}')
+    free_space=$(df -k "$(dirname "$APP_PATH")" | tail -1 | awk '{print $4}')
     if [ "$free_space" -lt "$REQUIRED_SPACE" ]; then
         log "Error: At least 5GB of free space is required"
         exit 1
