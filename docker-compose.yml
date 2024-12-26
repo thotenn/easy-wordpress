@@ -19,7 +19,7 @@ services:
     depends_on:
       - db
     image: wordpress:latest
-    volumes: *common-volumes
+    volumes: ./wp_data:/var/www/html
     ports:
       - "80:80"
     expose:
@@ -42,7 +42,7 @@ services:
       - ./nginx:/etc/nginx/conf.d
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
-      - *common-volumes
+      - ./wp_data:/var/www/html
     restart: always
     profiles:
       - webserver
