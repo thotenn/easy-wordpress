@@ -9,7 +9,7 @@ set -e
 set -o pipefail
 
 # Global variables
-REQUIRED_SPACE=5242880  # 5GB in KB
+REQUIRED_SPACE=3000000  # 5GB in KB
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Logging function
@@ -438,6 +438,29 @@ create_services() {
     log "✓ Aliases created"
 }
 
+start_containers() {
+    log "Verifying Docker service..."
+    if ! check_docker_running; then
+        log "Error: Docker service is not running properly"
+        exit 1
+    fi
+    log "✓ Docker service is running"
+
+    log "Starting Docker containers..."
+    cd "$APP_PATH" || exit 1
+    docker-compose down 2>/dev/null || true  # Ensure that any existing containers are stopped
+    
+    PROFILES="--profile always"
+    if [ "$USE_WEBSERVER" = "true" ]; then
+        PROFILES="--profile always --profile webserver"
+        if [ "$USE_SSL" = "true" ]; then
+            PROFILES="$PROFILES --profile ssl"
+        fi
+    fi
+
+    docker-compose $PROFILES up -d
+}
+
 # Main installation process
 main() {
     log "=== Starting WordPress with Docker installation process ==="
@@ -460,21 +483,13 @@ main() {
     log "Step 6: Enabling and checking services..."
     enable_checking_services
 
-    log "Step 7: Verifying Docker service..."
-    if ! check_docker_running; then
-        log "Error: Docker service is not running properly"
-        exit 1
-    fi
+    log "Step 7: Starting Docker containers..."
+    start_containers
 
-    log "Step 8: Starting Docker containers..."
-    cd "$APP_PATH" || exit 1
-    docker-compose down 2>/dev/null || true  # Asegurarse de que no haya contenedores anteriores
-    docker-compose up -d
-
-    log "Step 9: Configuring SSL..."
+    log "Step 8: Configuring SSL..."
     configure_ssl
 
-    log "Step 10: Creating services..."
+    log "Step 9: Creating services..."
     create_services
 
     log "=== Installation completed successfully! ==="

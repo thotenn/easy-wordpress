@@ -1,3 +1,6 @@
+x-common-volumes: &common-volumes
+  - ./wp_data:/var/www/html
+
 services:
   db:
     image: mysql:5.7
@@ -9,13 +12,16 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     restart: always
+    profiles:
+      - always
 
   wordpress:
     depends_on:
       - db
     image: wordpress:latest
-    volumes:
-      - ./wp_data:/var/www/html
+    volumes: *common-volumes
+    ports:
+      - ${USE_WEBSERVER:-false} && "80:80"
     expose:
       - "80"
     environment:
@@ -24,21 +30,27 @@ services:
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
       WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
     restart: always
+    profiles:
+      - always
   
   webserver:
     image: nginx:latest
     ports:
       - "80:80"
-      - "443:443"
+      - ${USE_SSL:-false} && "443:443"
     volumes:
       - ./nginx:/etc/nginx/conf.d
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
-      - ./wp_data:/var/www/html
+      - *common-volumes
     restart: always
+    profiles:
+      - webserver
 
   certbot:
     image: certbot/certbot
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
+    profiles:
+      - ssl
