@@ -38,7 +38,8 @@ preflight_checks() {
     fi
 
     # Load environment variables
-    source "$SCRIPT_DIR/load_env.sh" || { log "Error: Could not load environment variables"; exit 1; }
+    source "$(dirname "$(dirname "${BASH_SOURCE[0]}")")/load_env.sh"
+    load_env
 
     # Required environment variables check
     local required_vars=(
