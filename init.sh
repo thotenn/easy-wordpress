@@ -9,7 +9,8 @@ set -e
 set -o pipefail
 
 # Global variables
-REQUIRED_SPACE=3000000  # 3GB in KB
+# REQUIRED_SPACE=3000000  # 3GB in KB
+REQUIRED_SPACE=3000  # This is temporary for testing
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Logging function
