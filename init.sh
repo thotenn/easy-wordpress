@@ -163,7 +163,7 @@ install_docker() {
     apt update && apt upgrade -y
 
     log "Installing dependencies..."
-    apt install -y apt-transport-https ca-certificates curl gnupg lsb-release python3-distutils
+    apt install -y apt-transport-https ca-certificates curl gnupg lsb-release python3-pip
 
     log "Adding Docker repository..."
     # Add GPG docker key
