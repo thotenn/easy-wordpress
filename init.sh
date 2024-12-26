@@ -101,7 +101,6 @@ preflight_checks() {
 
     # Required environment variables check
     local required_vars=(
-        "APP_PATH"
         "LOG_FILE"
         "USE_WEBSERVER"
         "USE_SSL"
@@ -118,14 +117,6 @@ preflight_checks() {
             exit 1
         fi
     done
-
-    # Check disk space
-    local free_space
-    free_space=$(df -k "$(dirname "$APP_PATH")" | tail -1 | awk '{print $4}')
-    if [ "$free_space" -lt "$REQUIRED_SPACE" ]; then
-        log "Error: At least 5GB of free space is required"
-        exit 1
-    fi
 }
 
 # Create necessary directories with proper permissions
@@ -142,6 +133,13 @@ create_directories() {
     chmod 755 "$APP_PATH"
     chmod 700 "$APP_PATH"/db_data
     chmod 755 "$APP_PATH"/{nginx,wp_data,certbot}
+    # Check disk space
+    local free_space
+    free_space=$(df -k "$(dirname "$APP_PATH")" | tail -1 | awk '{print $4}')
+    if [ "$free_space" -lt "$REQUIRED_SPACE" ]; then
+        log "Error: At least 5GB of free space is required"
+        exit 1
+    fi
     log "✓ Directories created successfully"
 }
 
@@ -236,7 +234,7 @@ install_docker() {
     apt update
     apt install -y docker-ce docker-ce-cli docker-compose containerd.io docker-compose-plugin certbot python3-certbot-nginx
 
-    # Configurar permisos para el socket de Docker
+    # Configure Docker socket permissions
     log "Configuring Docker permissions..."
     DOCKER_SOCKET=/var/run/docker.sock
     if [ -S "$DOCKER_SOCKET" ]; then
@@ -251,7 +249,7 @@ install_docker() {
         log "Adding current user to docker group..."
         usermod -aG "$DOCKER_GID" root
         
-        # Aplicar los nuevos permisos de grupo
+        # Apply new group permissions
         log "Applying new group permissions..."
         chmod 666 "$DOCKER_SOCKET"
         
