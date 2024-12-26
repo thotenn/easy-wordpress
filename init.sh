@@ -218,8 +218,12 @@ install_docker() {
     log "Installing dependencies..."
     apt install -y apt-transport-https ca-certificates curl gnupg lsb-release python3-pip
 
+    apt remove -y docker docker-engine docker.io containerd runc || true
+    rm -rf /var/lib/docker /var/lib/containerd || true
+
     log "Adding Docker repository..."
     # Add GPG docker key
+    mkdir -p /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
 
@@ -232,7 +236,15 @@ install_docker() {
 
     log "Installing Docker and required packages..."
     apt update
-    apt install -y docker-ce docker-ce-cli docker-compose containerd.io certbot python3-certbot-nginx
+    apt install -y docker-ce docker-ce-cli docker-compose containerd.io docker-compose-plugin certbot python3-certbot-nginx
+    # Configure Docker to start on boot
+    if ! is_container; then
+        systemctl enable docker.service
+        systemctl enable containerd.service
+    fi
+    
+    # Create docker group if it doesn't exist
+    groupadd -f docker
     log "Verifying Docker installation..."
     docker --version
 
@@ -254,6 +266,13 @@ install_docker() {
         systemctl start docker
         systemctl enable docker
     fi
+
+    log "Waiting for Docker socket to become available..."
+    timeout 30 sh -c 'until [ -S /var/run/docker.sock ]; do sleep 1; done' || {
+        log "Error: Docker socket did not become available in time"
+        exit 1
+    }
+    
     log "✓ Docker service started"
 }
 
