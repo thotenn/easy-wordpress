@@ -30,6 +30,29 @@ cleanup() {
 # Set up error handling
 trap cleanup ERR
 
+# Function to check if we are in a container
+is_container() {
+    [ -f /.dockerenv ] || grep -q '/docker/' /proc/1/cgroup || grep -q '/lxc/' /proc/1/cgroup
+}
+
+# Function to start services
+start_service() {
+    local service_name="$1"
+    if is_container; then
+        service "$service_name" start 2>/dev/null || true
+    else
+        systemctl start "$service_name" 2>/dev/null || true
+    fi
+}
+
+# Function for enabling services
+enable_service() {
+    local service_name="$1"
+    if ! is_container; then
+        systemctl enable "$service_name" 2>/dev/null || true
+    fi
+}
+
 # Pre-flight checks
 preflight_checks() {
     if [ "$EUID" -ne 0 ]; then 
@@ -195,8 +218,12 @@ install_docker() {
 
     log "✓ Docker and Docker Compose installed successfully"
     log "Starting Docker service..."
-    systemctl start docker
-    systemctl enable docker
+    if is_container; then
+        service docker start || true
+    else
+        systemctl start docker
+        systemctl enable docker
+    fi
     log "✓ Docker service started"
 }
 
