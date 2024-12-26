@@ -39,8 +39,7 @@ preflight_checks() {
     fi
 
     # Load environment variables
-    source "$PROJECT_ROOT/load_env.sh"
-    load_env
+    source "$SCRIPT_DIR/load_env.sh" || { log "Error: Could not load environment variables"; exit 1; }
 
     if [ -z "${APP_PATH:-}" ] || [ -z "${DOMAIN:-}" ]; then
         log "Error: APP_PATH or DOMAIN variables are not set"
@@ -64,7 +63,7 @@ preflight_checks() {
 
     # Check disk space
     local free_space
-    free_space=$(df -k "$(dirname "$APP_PATH")" | tail -1 | awk '{print $4}')
+    free_space=$(df -k "$(dirname "$APP_PATH")" | tail -1 | awk '{print \$4}')
     if [ "$free_space" -lt "$REQUIRED_SPACE" ]; then
         log "Error: At least 5GB of free space is required"
         exit 1
@@ -183,34 +182,63 @@ server {
 }
 EOL
     chmod 644 "$APP_PATH/nginx/default.conf"
+    fi
 }
 
 # Install Docker and dependencies
 install_docker() {
     log "Updating system packages..."
-    apt update && apt upgrade -y
-
-    log "Installing dependencies..."
+    apt update
+    
+    log "Installing essential packages..."
     apt install -y \
         apt-transport-https \
         ca-certificates \
         curl \
         gnupg \
         lsb-release \
+        sudo \
         ufw
 
-    log "Adding Docker repository..."
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    log "Adding Docker official GPG key..."
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
 
-    log "Installing Docker and required packages..."
+    log "Setting up Docker repository..."
+    echo \
+        "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+        "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+        tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    log "Installing Docker packages..."
     apt update
-    apt install -y docker-ce docker-ce-cli docker-compose containerd.io certbot python3-certbot-nginx
+    apt install -y \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin \
+        python3-certbot-nginx
 
+    log "Installing Docker Compose..."
+    curl -SL https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+
+    log "Verifying installations..."
     if ! docker --version; then
         log "Error: Docker installation failed"
         exit 1
     fi
+    
+    if ! docker-compose --version; then
+        log "Error: Docker Compose installation failed"
+        exit 1
+    fi
+
+    log "Starting Docker service..."
+    systemctl start docker
+    systemctl enable docker
 }
 
 # Copy configuration files
@@ -228,9 +256,21 @@ copy_config_files() {
 # Configure firewall
 configure_firewall() {
     log "Configuring firewall..."
+    if ! command -v ufw >/dev/null 2>&1; then
+        log "Installing UFW firewall..."
+        apt install -y ufw
+    fi
+
+    log "Setting up firewall rules..."
+    ufw allow OpenSSH
     ufw allow 80/tcp
     ufw allow 443/tcp
-    ufw --force enable
+    
+    log "Enabling firewall..."
+    echo "y" | ufw enable || true
+    
+    log "Firewall status:"
+    ufw status
 }
 
 # Start Docker containers
