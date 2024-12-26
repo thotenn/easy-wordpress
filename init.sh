@@ -180,7 +180,6 @@ install_docker() {
     log "Installing Docker and required packages..."
     apt update
     apt install -y docker-ce docker-ce-cli docker-compose containerd.io certbot python3-certbot-nginx
-    chmod +x /usr/local/bin/docker-compose
     log "Verifying Docker installation..."
     docker --version
 
