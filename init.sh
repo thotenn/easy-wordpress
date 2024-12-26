@@ -60,6 +60,14 @@ check_docker_running() {
     
     log "Checking Docker connectivity..."
     
+    # Asegurarse de que estamos en el grupo docker
+    if ! groups | grep -q docker; then
+        log "Adding current user to docker group..."
+        DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+        groupadd -g "$DOCKER_GID" docker 2>/dev/null || true
+        usermod -aG docker root
+    fi
+    
     while [ $attempt -le $max_attempts ]; do
         if docker version >/dev/null 2>&1; then
             log "✓ Docker is accessible"
@@ -71,8 +79,14 @@ check_docker_running() {
         attempt=$((attempt + 1))
     done
     
-    log "Error: Cannot connect to Docker. Please make sure the Docker socket is mounted correctly"
-    log "Try running the container with: -v /var/run/docker.sock:/var/run/docker.sock"
+    log "Error: Cannot connect to Docker. Debugging information:"
+    log "Socket permissions:"
+    ls -l /var/run/docker.sock
+    log "Current user and groups:"
+    id
+    log "Docker socket group:"
+    stat -c '%g' /var/run/docker.sock
+    
     return 1
 }
 
@@ -205,15 +219,7 @@ EOL
 
 # Install Docker and required packages
 install_docker() {
-    if [ -S "/var/run/docker.sock" ]; then
-        log "Docker socket found, checking if it's functional..."
-        if docker version >/dev/null 2>&1; then
-            log "✓ Host Docker socket is functional, skipping Docker installation"
-            return 0
-        fi
-    fi
-
-    log "Installing Docker client only..."
+    log "Installing Docker client..."
     apt update && apt upgrade -y
 
     log "Installing dependencies..."
@@ -232,6 +238,32 @@ install_docker() {
     log "Installing Docker client packages..."
     apt update
     apt install -y docker-ce-cli docker-compose-plugin
+
+    # Configurar permisos para el socket de Docker
+    log "Configuring Docker permissions..."
+    DOCKER_SOCKET=/var/run/docker.sock
+    if [ -S "$DOCKER_SOCKET" ]; then
+        DOCKER_GID=$(stat -c '%g' "$DOCKER_SOCKET")
+        GROUP_EXISTS=$(getent group "$DOCKER_GID" || true)
+        
+        if [ -z "$GROUP_EXISTS" ]; then
+            log "Creating docker group..."
+            groupadd -g "$DOCKER_GID" docker
+        fi
+        
+        log "Adding current user to docker group..."
+        usermod -aG "$DOCKER_GID" root
+        
+        # Aplicar los nuevos permisos de grupo sin necesidad de reiniciar
+        log "Applying new group permissions..."
+        newgrp docker <<EONG
+        log "Testing Docker connectivity..."
+        docker version >/dev/null 2>&1
+EONG
+    else
+        log "Error: Docker socket not found at $DOCKER_SOCKET"
+        return 1
+    fi
 
     log "✓ Docker client installed successfully"
 }
