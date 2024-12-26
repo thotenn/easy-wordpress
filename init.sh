@@ -53,7 +53,6 @@ enable_service() {
     fi
 }
 
-# Función para verificar el estado de Docker
 # Function to check Docker service status
 check_docker_running() {
     local max_attempts=30
@@ -63,7 +62,7 @@ check_docker_running() {
     
     while [ $attempt -le $max_attempts ]; do
         if [ -S "/var/run/docker.sock" ]; then
-            if docker info >/dev/null 2>&1; then
+            if docker version &>/dev/null; then
                 log "✓ Docker service is running"
                 return 0
             fi
@@ -71,7 +70,11 @@ check_docker_running() {
         
         log "Waiting for Docker service to start (attempt $attempt/$max_attempts)..."
         if is_container; then
-            service docker start || true
+            # Si el socket no existe y estamos en un contenedor, intentar reiniciar dockerd
+            if ! pidof dockerd >/dev/null; then
+                log "Restarting Docker daemon..."
+                dockerd &>/var/log/dockerd.log &
+            fi
         else
             systemctl start docker || true
         fi
@@ -80,6 +83,10 @@ check_docker_running() {
     done
     
     log "Error: Docker service failed to start after $max_attempts attempts"
+    if [ -f "/var/log/dockerd.log" ]; then
+        log "Docker daemon logs:"
+        tail -n 20 /var/log/dockerd.log
+    fi
     return 1
 }
 
@@ -237,43 +244,52 @@ install_docker() {
     log "Installing Docker and required packages..."
     apt update
     apt install -y docker-ce docker-ce-cli docker-compose containerd.io docker-compose-plugin certbot python3-certbot-nginx
-    # Configure Docker to start on boot
-    if ! is_container; then
-        systemctl enable docker.service
-        systemctl enable containerd.service
-    fi
-    
-    # Create docker group if it doesn't exist
-    groupadd -f docker
-    log "Verifying Docker installation..."
-    docker --version
 
-    if ! docker --version; then
-        log "Error: Docker installation failed"
-        exit 1
-    fi
-    
-    if ! docker-compose --version; then
-        log "Error: Docker Compose installation failed"
-        exit 1
+    if [ -f "/etc/init.d/docker" ]; then
+        sed -i 's/ulimit -n 1048576/# ulimit -n 1048576/' /etc/init.d/docker
+        sed -i 's/ulimit -u 1048576/# ulimit -u 1048576/' /etc/init.d/docker
     fi
 
-    log "✓ Docker and Docker Compose installed successfully"
-    log "Starting Docker service..."
     if is_container; then
-        service docker start || true
+        # Create minimal Docker configuration
+        mkdir -p /etc/docker
+        cat > /etc/docker/daemon.json <<EOF
+{
+    "iptables": false,
+    "live-restore": true,
+    "debug": true
+}
+EOF
+        
+        # Trying to start Docker without systemd
+        dockerd &>/var/log/dockerd.log &
+        DOCKER_PID=$!
+        
+        # Wait for Docker socket to become available
+        log "Waiting for Docker socket to become available..."
+        TIMEOUT=30
+        COUNTER=0
+        while [ ! -S /var/run/docker.sock ] && [ $COUNTER -lt $TIMEOUT ]; do
+            sleep 1
+            COUNTER=$((COUNTER + 1))
+        done
+
+        if [ ! -S /var/run/docker.sock ]; then
+            log "Error: Docker failed to start. Check /var/log/dockerd.log for details"
+            exit 1
+        fi
     else
-        systemctl start docker
-        systemctl enable docker
+        systemctl enable docker.service
+        systemctl start docker.service
     fi
 
-    log "Waiting for Docker socket to become available..."
-    timeout 30 sh -c 'until [ -S /var/run/docker.sock ]; do sleep 1; done' || {
-        log "Error: Docker socket did not become available in time"
+    # Verify the installation
+    timeout 30 sh -c 'until docker version &>/dev/null; do sleep 1; done' || {
+        log "Error: Docker installation verification failed"
         exit 1
     }
     
-    log "✓ Docker service started"
+    log "✓ Docker installed and running"
 }
 
 # Enable and check services
