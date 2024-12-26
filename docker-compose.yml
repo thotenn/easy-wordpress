@@ -21,7 +21,7 @@ services:
     image: wordpress:latest
     volumes: *common-volumes
     ports:
-      - ${USE_WEBSERVER:-false} && "80:80"
+      - "80:80"
     expose:
       - "80"
     environment:
@@ -37,7 +37,7 @@ services:
     image: nginx:latest
     ports:
       - "80:80"
-      - ${USE_SSL:-false} && "443:443"
+      - "443:443"
     volumes:
       - ./nginx:/etc/nginx/conf.d
       - ./certbot/conf:/etc/letsencrypt
