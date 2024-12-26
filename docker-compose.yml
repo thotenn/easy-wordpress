@@ -18,8 +18,6 @@ services:
     image: wordpress:latest
     volumes: 
       - ./wp_data:/var/www/html
-    ports:
-      - "80:80"
     expose:
       - "80"
     environment:
