@@ -55,38 +55,24 @@ enable_service() {
 
 # Function to check Docker service status
 check_docker_running() {
-    local max_attempts=30
+    local max_attempts=5
     local attempt=1
     
-    log "Checking Docker service status..."
+    log "Checking Docker connectivity..."
     
     while [ $attempt -le $max_attempts ]; do
-        if [ -S "/var/run/docker.sock" ]; then
-            if docker version &>/dev/null; then
-                log "✓ Docker service is running"
-                return 0
-            fi
+        if docker version >/dev/null 2>&1; then
+            log "✓ Docker is accessible"
+            return 0
         fi
         
-        log "Waiting for Docker service to start (attempt $attempt/$max_attempts)..."
-        if is_container; then
-            # Si el socket no existe y estamos en un contenedor, intentar reiniciar dockerd
-            if ! pidof dockerd >/dev/null; then
-                log "Restarting Docker daemon..."
-                dockerd &>/var/log/dockerd.log &
-            fi
-        else
-            systemctl start docker || true
-        fi
+        log "Waiting for Docker to become accessible (attempt $attempt/$max_attempts)..."
         sleep 2
         attempt=$((attempt + 1))
     done
     
-    log "Error: Docker service failed to start after $max_attempts attempts"
-    if [ -f "/var/log/dockerd.log" ]; then
-        log "Docker daemon logs:"
-        tail -n 20 /var/log/dockerd.log
-    fi
+    log "Error: Cannot connect to Docker. Please make sure the Docker socket is mounted correctly"
+    log "Try running the container with: -v /var/run/docker.sock:/var/run/docker.sock"
     return 1
 }
 
@@ -219,6 +205,37 @@ EOL
 
 # Install Docker and required packages
 install_docker() {
+    if [ -S "/var/run/docker.sock" ]; then
+        log "Docker socket found, checking if it's functional..."
+        if docker version >/dev/null 2>&1; then
+            log "✓ Host Docker socket is functional, skipping Docker installation"
+            return 0
+        fi
+    fi
+
+    log "Installing Docker client only..."
+    apt update && apt upgrade -y
+
+    log "Installing dependencies..."
+    apt install -y apt-transport-https ca-certificates curl gnupg lsb-release python3-pip
+
+    log "Adding Docker repository..."
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+
+    echo \
+        "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+        "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+        tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    log "Installing Docker client packages..."
+    apt update
+    apt install -y docker-ce-cli docker-compose-plugin
+
+    log "✓ Docker client installed successfully"
+}
+install_docker_old() {
     log "Updating system packages..."
     apt update && apt upgrade -y
 
