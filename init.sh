@@ -60,12 +60,9 @@ check_docker_running() {
     
     log "Checking Docker connectivity..."
     
-    # Asegurarse de que estamos en el grupo docker
-    if ! groups | grep -q docker; then
-        log "Adding current user to docker group..."
-        DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
-        groupadd -g "$DOCKER_GID" docker 2>/dev/null || true
-        usermod -aG docker root
+    # Asegurarse de que el socket tiene los permisos correctos
+    if [ -S "/var/run/docker.sock" ]; then
+        chmod 666 /var/run/docker.sock
     fi
     
     while [ $attempt -le $max_attempts ]; do
@@ -254,12 +251,15 @@ install_docker() {
         log "Adding current user to docker group..."
         usermod -aG "$DOCKER_GID" root
         
-        # Aplicar los nuevos permisos de grupo sin necesidad de reiniciar
+        # Aplicar los nuevos permisos de grupo
         log "Applying new group permissions..."
-        newgrp docker <<EONG
+        chmod 666 "$DOCKER_SOCKET"
+        
         log "Testing Docker connectivity..."
-        docker version >/dev/null 2>&1
-EONG
+        if ! docker version >/dev/null 2>&1; then
+            log "Error: Docker is still not accessible after permission changes"
+            return 1
+        fi
     else
         log "Error: Docker socket not found at $DOCKER_SOCKET"
         return 1
