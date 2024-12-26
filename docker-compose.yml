@@ -1,6 +1,3 @@
-x-common-volumes: &common-volumes
-  - ./wp_data:/var/www/html
-
 services:
   db:
     image: mysql:5.7
@@ -19,7 +16,8 @@ services:
     depends_on:
       - db
     image: wordpress:latest
-    volumes: ./wp_data:/var/www/html
+    volumes: 
+      - ./wp_data:/var/www/html
     ports:
       - "80:80"
     expose:
